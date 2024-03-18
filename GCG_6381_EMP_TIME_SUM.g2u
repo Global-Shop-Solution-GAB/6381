@@ -1,0 +1,633 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.Form..Create(BaseForm)
+Gui.Form..Caption("Time and Attendance Summary")
+Gui.Form..Size(4050,1170)
+Gui.Form..MinX(0)
+Gui.Form..MinY(0)
+Gui.Form..Position(0,0)
+Gui.Form..BackColor(-2147483633)
+Gui.Form..MousePointer(0)
+Gui.Form..Event(UnLoad,Unload)
+Gui.Form..AlwaysOnTop(False)
+Gui.Form..FontName("Tahoma")
+Gui.Form..FontSize(8.25)
+Gui.Form..ControlBox(True)
+Gui.Form..MaxButton(True)
+Gui.Form..MinButton(True)
+Gui.Form..Moveable(True)
+Gui.Form..Sizeable(True)
+Gui.Form..ShowInTaskBar(True)
+Gui.Form..TitleBar(True)
+Gui.Form.dtpSelection.Create(DatePicker)
+Gui.Form.dtpSelection.Size(2580,285)
+Gui.Form.dtpSelection.Position(90,390)
+Gui.Form.dtpSelection.Enabled(True)
+Gui.Form.dtpSelection.Visible(True)
+Gui.Form.dtpSelection.Zorder(0)
+Gui.Form.dtpSelection.CheckBox(False)
+Gui.Form.dtpSelection.FontName("Tahoma")
+Gui.Form.dtpSelection.FontSize(8.25)
+Gui.Form.cmdProcess.Create(Button)
+Gui.Form.cmdProcess.Size(1110,360)
+Gui.Form.cmdProcess.Position(2790,315)
+Gui.Form.cmdProcess.Caption("Process")
+Gui.Form.cmdProcess.Event(Click,ProcessData)
+Gui.Form.cmdProcess.Enabled(True)
+Gui.Form.cmdProcess.Visible(True)
+Gui.Form.cmdProcess.Zorder(0)
+Gui.Form.cmdProcess.FontName("Tahoma")
+Gui.Form.cmdProcess.FontSize(8.25)
+Gui.Form.lbl1.Create(Label,"Select date to export",True,1500,210,0,105,120,True,0,"Arial",8,-2147483633,0,0)
+Gui.Form.lbl1.BorderStyle(0)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Customer: LHD Equipment
+'Developer: FEQ (Sisco)
+'Date: June 8th
+'This is one of two reports that were created to help with keeping track of Time and Attendance.
+
+'Bryan Pham
+'12/11/2023
+'Use JOB_DETAIL for balanced hours
+'Call: LHD010-11120231536-0
+
+Gui.Form..Show
+
+F.Intrinsic.Control.ExitSub
+
+Program.Sub.Main.End
+
+Program.Sub.DateSelection.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.dCheck.Declare(Date, "01/01/1900")
+V.Local.iDay.Declare(Long, 0)
+V.Local.iNewDay.Declare(Long, 0)
+
+'The date that the user selected should be a Saturday. If it is not, we are going to manually change it
+F.Intrinsic.Control.BlockEvents
+
+V.Local.dCheck.Set(V.Screen.Form!dtpSelection.Value)
+
+F.Intrinsic.Date.Weekday(V.Local.dCheck, V.Local.iDay)
+
+'We need the value of iDay ot be seven..
+F.Intrinsic.Math.Sub(0, V.Local.iDay, V.Local.iNewDay)
+
+F.Intrinsic.Control.If(V.Local.iNewDay, <>, -7)
+	F.Intrinsic.Date.DateAdd("d", V.Local.iNewDay, V.Local.dCheck, V.Local.dCheck)
+F.Intrinsic.Control.EndIf
+
+Gui.Form.dtpSelection.Value(V.Local.dCheck)
+
+Gui.Form.cmdProcess.SetFocus
+
+F.Intrinsic.Control.UnBlockEvents
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.Control.CallSub(Error, "Subroutine", V.Ambient.CurrentSubroutine, "ErrorNo", V.Ambient.ErrorNumber, "ErrorDesc", V.Ambient.ErrorDescription)
+F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.DateSelection.End
+
+Program.Sub.ProcessData.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sSql.Declare(String, "")
+V.Local.sEmp.Declare(String, "")
+V.Local.sName.Declare(String, "")
+V.Local.sFilter.Declare(String, "")
+V.Local.sTemp.Declare(String, "")
+V.Local.sWeek.Declare(String, "")
+V.Local.sDept.Declare(String, "")
+V.Local.sShSat.Declare(String, "")
+V.Local.sShSun.Declare(String, "")
+V.Local.sShMon.Declare(String, "")
+V.Local.sShTue.Declare(String, "")
+V.Local.sShWed.Declare(String, "")
+V.Local.sShThr.Declare(String, "")
+V.Local.sShFri.Declare(String, "")
+V.Local.fTimeSat.Declare(Float, 0.00)
+V.Local.fTimeSun.Declare(Float, 0.00)
+V.Local.fTimeMon.Declare(Float, 0.00)
+V.Local.fTimeTue.Declare(Float, 0.00)
+V.Local.fTimeWed.Declare(Float, 0.00)
+V.Local.fTimeThr.Declare(Float, 0.00)
+V.Local.fTimeFri.Declare(Float, 0.00)
+V.Local.fTotalHours.Declare(Float, 0.00)
+V.Local.fTotalMins.Declare(Float, 0.00)
+V.Local.dStart.Declare(Date, "01/01/1900")
+V.Local.dEnd.Declare(Date, "01/01/1900")
+V.Local.iYear.Declare(Long, 0)
+V.Local.iNewDay.Declare(Long, 0)
+V.Local.iLoop.Declare(Long, 0)
+v.Local.dLastDay.Declare
+
+F.Intrinsic.Control.BlockEvents
+Gui.Form..Visible(False)
+
+
+'Found that in some circumstances, the date change events will act funny, so we removed it from the datepicker and are processing it manually
+F.Intrinsic.Control.CallSub(DateSelection)
+
+V.Local.dStart.Set(V.Screen.Form!dtpSelection.Value)
+
+F.Intrinsic.Date.DateAdd("d", 6, V.Local.dStart, V.Local.dEnd)
+v.Local.dLastDay.Set(v.Local.dEnd)
+'F.Intrinsic.String.Build("select EMPLOYEE, CHARGE_DATE, DATE_IN, NAME, DEPT, SHIFT, REC_GROUP, EARNINGS_CODE, HOURS_HH, HOURS_MM, ACTUAL_DATE, DEPT from V_TIME_ATTENDANCE where CHARGE_DATE between '{0}' and '{1}'", V.Local.dStart.PervasiveDate, V.Local.dEnd.PervasiveDate, V.Local.sSql)
+
+'BP - get the balanced hours from JOB_DETAIL
+F.Intrinsic.String.Build("select RTRIM(EMPL) as EMPLOYEE,  '' as NAME, CHARGE_DATE, SHIFT_SHIFT as SHIFT, DEPT_EMP as DEPT,sum(HOURS_WORKED) as Tot_Hrs from V_JOB_DETAIL where CHARGE_DATE between '{0}' and '{1}' and LMO = 'L' group by EMPLOYEE,NAME,CHARGE_DATE,SHIFT_SHIFT,DEPT_EMP", V.Local.dStart.PervasiveDate, V.Local.dEnd.PervasiveDate, V.Local.sSql)
+
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+F.Data.DataTable.CreateFromSQL("dtEmps", "conx", V.Local.sSql, True)
+
+
+f.Data.Dictionary.CreateFromSQL("dEmpName","conx","Select EMPLOYEE,RTRIM(NAME) from V_EMPLOYEE_MSTR")
+f.Data.Dictionary.SetDefaultReturn("dEmpName","")
+f.Data.Datatable.FillFromDictionary("dtEmps","dEmpName","EMPLOYEE","NAME")
+f.Data.Dictionary.Close("dEmpName")
+
+
+F.Intrinsic.Control.If(V.DataTable.dtEmps.RowCount, >, 0)
+	'There is data to process. Delete info from previous user execution and create tables to fill: We are using the terminal number as key for the process
+	F.Intrinsic.String.Build("Delete from GCG_6381_TA_HEAD where TERMINAL_NO = '{0}'", V.Caller.Terminal, V.Local.sSql)
+	
+	F.ODBC.Connection!conx.Execute(V.Local.sSql)
+	
+	F.Intrinsic.String.Build("Delete from GCG_6381_TA_SUMMARY where TERMINAL_NO = '{0}'", V.Caller.Terminal, V.Local.sSql)
+	
+	F.ODBC.Connection!conx.Execute(V.Local.sSql)
+	
+	F.Intrinsic.String.Build("Select TERMINAL_NO, BI_RUN_ID, REPT_ID, REPT_TYPE, SHIFT_NO, PAY_WEEK, PAY_DATE, RUN_DATE from GCG_6381_TA_HEAD where TERMINAL_NO = '{0}'", V.Caller.Terminal, V.Local.sSql)
+	
+	F.Data.DataTable.CreateFromSQL("dtSumHead", "conx", V.Local.sSql, True)
+	
+	F.Intrinsic.String.Build("Select TERMINAL_NO, BI_RUN_ID, REPT_ID, EMP_NO, EMP_NAME, SAT_TIME, SAT_SHIFT, SUN_TIME, SUN_SHIFT, MON_TIME, MON_SHIFT, TUE_TIME, TUE_SHFT, WED_TIME, WED_SHIFT, THR_TIME, THR_SHIFT, FRI_TIME, FRI_SHIFT, TTL_TIME, DEPT from GCG_6381_TA_SUMMARY where TERMINAL_NO = '{0}'", V.Caller.Terminal, V.Local.sSql)
+	
+	F.Data.DataTable.CreateFromSQL("dtSumLines", "conx", V.Local.sSql, True)
+	
+	F.Intrinsic.String.Build("Select DISTINCT EMPLOYEE from V_TIME_ATTENDANCE where CHARGE_DATE between '{0}' and '{1}'", V.Local.dStart.PervasiveDate, V.Local.dEnd.PervasiveDate, V.Local.sSql)
+	
+	F.Data.DataTable.CreateFromSQL("dtForLoop", "conx", V.Local.sSql, True)
+	
+	'All data needed has been pulled into local memory, so let's close the connection
+	F.ODBC.Connection!conx.Close
+
+	
+	'For the header, we need to calculate what week of the year we are looking at:
+	F.Intrinsic.Date.Year(V.Local.dStart, V.Local.iYear)
+	F.Intrinsic.String.Build("01/01/{0}", V.Local.iYear, V.Local.sTemp)
+	F.Intrinsic.Date.ConvertDString(V.Local.sTemp, "MM/DD/YYYY", V.Local.dEnd)
+	F.Intrinsic.Date.DateDiff("WW", V.Local.dEnd, V.Local.dStart, V.Local.iYear)
+	F.Intrinsic.String.LPad(V.Local.iYear, "0", 2, V.Local.sWeek)
+	
+	'BP - they wanted to show the last day
+	'F.Data.DataTable.AddRow("dtSumHead", "REPT_TYPE", "", "SHIFT_NO", "", "PAY_WEEK", V.Local.sWeek, "PAY_DATE", V.Local.dStart, "RUN_DATE", V.Ambient.Now)
+
+	F.Data.DataTable.AddRow("dtSumHead", "REPT_TYPE", "", "SHIFT_NO", "", "PAY_WEEK", V.Local.sWeek, "PAY_DATE", V.Local.dLastDay, "RUN_DATE", V.Ambient.Now)
+	
+	'We are going to loop through the list of distinct employees and add in the time that they put in per day
+	F.Intrinsic.Control.For(V.Local.iLoop, 0, V.DataTable.dtForLoop.RowCount--, 1)
+		V.Local.sEmp.Set(V.DataTable.dtForLoop(V.Local.iLoop).EMPLOYEE!FieldValTrim)
+
+		'Build the string for the employee filter for the main table: First we do -SATURDAY-
+		F.Intrinsic.String.Build("[EMPLOYEE] = '{0}' and [CHARGE_DATE] = '{1}'", V.Local.sEmp, V.Local.dStart, V.Local.sFilter)
+		
+		F.Data.DataView.Create("dtEmps", "dvSat", 22, V.Local.sFilter, "CHARGE_DATE ASC")
+		
+		F.Intrinsic.Control.If(V.DataView.dtEmps!dvSat.RowCount, >, 0)
+			'Grab the values from the table
+			V.Local.sName.Set(V.DataView.dtEmps!dvSat(0).NAME!FieldValTrim)
+			V.Local.sDept.Set(V.DataView.dtEmps!dvSat(0).DEPT!FieldValTrim)
+			
+			F.Intrinsic.Control.CallSub(EarnCode, "RAWCODE", V.DataView.dtEmps!dvSat(0).SHIFT!FieldValTrim)
+			
+			V.Local.sShSat.Set(V.Args.PROCCODE)
+			
+			'BP - we already have total hours from job details
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_HH)", V.Local.sFilter, V.Local.fTotalHours)
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_MM)", V.Local.sFilter, V.Local.fTotalMins)
+'			
+'			F.Intrinsic.Control.CallSub(ShiftTime, "DAY_HOURS", V.Local.fTotalHours, "DAY_MINS", V.Local.fTotalMins)
+			
+			'V.Local.fTimeSat.Set(V.Args.TIME.Float)
+			V.Local.fTimeSat.Set(V.DataView.dtEmps!dvSat(0).Tot_Hrs!FieldValFloat)
+			f.Intrinsic.String.Format(V.Local.fTimeSat,"#.0",v.Local.fTimeSat)
+		F.Intrinsic.Control.Else
+			'Set the values to blank otherwise
+			V.Local.sShSat.Set("")
+			V.Local.fTimeSat.Set(0.00)
+			
+		F.Intrinsic.Control.EndIf
+			
+		F.Data.DataView.Close("dtEmps", "dvSat")
+		
+		'Add one day to the date and repeat process -SUNDAY-
+		F.Intrinsic.Date.DateAdd("d", 1, V.Local.dStart, V.Local.dEnd)
+		
+		F.Intrinsic.String.Build("[EMPLOYEE] = '{0}' and [CHARGE_DATE] = '{1}'", V.Local.sEmp, V.Local.dEnd, V.Local.sFilter)
+		
+		F.Data.DataView.Create("dtEmps", "dvSun", 22, V.Local.sFilter, "CHARGE_DATE ASC")
+		
+		F.Intrinsic.Control.If(V.DataView.dtEmps!dvSun.RowCount, >, 0)
+			V.Local.sName.Set(V.DataView.dtEmps!dvSun(0).NAME!FieldValTrim)
+			V.Local.sDept.Set(V.DataView.dtEmps!dvSun(0).DEPT!FieldValTrim)
+			
+			F.Intrinsic.Control.CallSub(EarnCode, "RAWCODE", V.DataView.dtEmps!dvSun(0).SHIFT!FieldValTrim)
+			
+			V.Local.sShSun.Set(V.Args.PROCCODE)
+			
+			'BP - we already have total hours from job details
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_HH)", V.Local.sFilter, V.Local.fTotalHours)
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_MM)", V.Local.sFilter, V.Local.fTotalMins)
+'			
+'			F.Intrinsic.Control.CallSub(ShiftTime, "DAY_HOURS", V.Local.fTotalHours, "DAY_MINS", V.Local.fTotalMins)
+'			
+'			V.Local.fTimeSun.Set(V.Args.TIME.Float)
+			V.Local.fTimeSun.Set(V.DataView.dtEmps!dvSun(0).Tot_Hrs!FieldValFloat)
+			f.Intrinsic.String.Format(V.Local.fTimeSun,"#.0",v.Local.fTimeSun)
+		F.Intrinsic.Control.Else
+			'Set the values to blank otherwise
+			V.Local.sShSun.Set("")
+			V.Local.fTimeSun.Set(0.00)
+			
+		F.Intrinsic.Control.EndIf
+			
+		F.Data.DataView.Close("dtEmps", "dvSun")
+		
+		'Add one day to the date and repeat process -MONDAY-
+		F.Intrinsic.Date.DateAdd("d", 1, V.Local.dEnd, V.Local.dEnd)
+		
+		F.Intrinsic.String.Build("[EMPLOYEE] = '{0}' and [CHARGE_DATE] = '{1}'", V.Local.sEmp, V.Local.dEnd, V.Local.sFilter)
+		
+		F.Data.DataView.Create("dtEmps", "dvMon", 22, V.Local.sFilter, "CHARGE_DATE ASC")
+		
+		F.Intrinsic.Control.If(V.DataView.dtEmps!dvMon.RowCount, >, 0)
+			V.Local.sName.Set(V.DataView.dtEmps!dvMon(0).NAME!FieldValTrim)
+			V.Local.sDept.Set(V.DataView.dtEmps!dvMon(0).DEPT!FieldValTrim)
+			
+			F.Intrinsic.Control.CallSub(EarnCode, "RAWCODE", V.DataView.dtEmps!dvMon(0).SHIFT!FieldValTrim)
+			
+			V.Local.sShMon.Set(V.Args.PROCCODE)
+			
+			'BP - we already have total hours from job details
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_HH)", V.Local.sFilter, V.Local.fTotalHours)
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_MM)", V.Local.sFilter, V.Local.fTotalMins)
+'			
+'			F.Intrinsic.Control.CallSub(ShiftTime, "DAY_HOURS", V.Local.fTotalHours, "DAY_MINS", V.Local.fTotalMins)
+'			
+'			V.Local.fTimeMon.Set(V.Args.TIME.Float)
+			V.Local.fTimeMon.Set(V.DataView.dtEmps!dvMon(0).Tot_Hrs!FieldValFloat)
+			f.Intrinsic.String.Format(V.Local.fTimeMon,"#.0",v.Local.fTimeMon)
+		F.Intrinsic.Control.Else
+			'Set the values to blank otherwise
+			V.Local.sShMon.Set("")
+			V.Local.fTimeMon.Set(0.00)
+			
+		F.Intrinsic.Control.EndIf
+		
+		F.Data.DataView.Close("dtEmps", "dvMon")
+		
+		'Add one day to the date and repeat process -TUESDAY-
+		F.Intrinsic.Date.DateAdd("d", 1, V.Local.dEnd, V.Local.dEnd)
+		
+		F.Intrinsic.String.Build("[EMPLOYEE] = '{0}' and [CHARGE_DATE] = '{1}'", V.Local.sEmp, V.Local.dEnd, V.Local.sFilter)
+		
+		F.Data.DataView.Create("dtEmps", "dvTue", 22, V.Local.sFilter, "CHARGE_DATE ASC")
+		
+		F.Intrinsic.Control.If(V.DataView.dtEmps!dvTue.RowCount, >, 0)
+			V.Local.sName.Set(V.DataView.dtEmps!dvTue(0).NAME!FieldValTrim)
+			V.Local.sDept.Set(V.DataView.dtEmps!dvTue(0).DEPT!FieldValTrim)
+			
+			F.Intrinsic.Control.CallSub(EarnCode, "RAWCODE", V.DataView.dtEmps!dvTue(0).SHIFT!FieldValTrim)
+			
+			V.Local.sShTue.Set(V.Args.PROCCODE)
+			
+			'BP - we already have total hours from job details
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_HH)", V.Local.sFilter, V.Local.fTotalHours)
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_MM)", V.Local.sFilter, V.Local.fTotalMins)
+'			
+'			F.Intrinsic.Control.CallSub(ShiftTime, "DAY_HOURS", V.Local.fTotalHours, "DAY_MINS", V.Local.fTotalMins)
+'			
+'			V.Local.fTimeTue.Set(V.Args.TIME.Float)
+			V.Local.fTimeTue.Set(V.DataView.dtEmps!dvTue(0).Tot_Hrs!FieldValFloat)
+			f.Intrinsic.String.Format(V.Local.fTimeTue,"#.0",v.Local.fTimeTue)
+		F.Intrinsic.Control.Else
+			'Set the values to blank otherwise
+			V.Local.sShTue.Set("")
+			V.Local.fTimeTue.Set(0.00)
+			
+		F.Intrinsic.Control.EndIf
+			
+		F.Data.DataView.Close("dtEmps", "dvTue")
+		
+		'Add one day to the date and repeat process -MONDAY-
+		F.Intrinsic.Date.DateAdd("d", 1, V.Local.dEnd, V.Local.dEnd)
+		
+		F.Intrinsic.String.Build("[EMPLOYEE] = '{0}' and [CHARGE_DATE] = '{1}'", V.Local.sEmp, V.Local.dEnd, V.Local.sFilter)
+		
+		F.Data.DataView.Create("dtEmps", "dvWed", 22, V.Local.sFilter, "CHARGE_DATE ASC")
+		
+		F.Intrinsic.Control.If(V.DataView.dtEmps!dvWed.RowCount, >, 0)
+			V.Local.sName.Set(V.DataView.dtEmps!dvWed(0).NAME!FieldValTrim)
+			V.Local.sDept.Set(V.DataView.dtEmps!dvWed(0).DEPT!FieldValTrim)
+			
+			F.Intrinsic.Control.CallSub(EarnCode, "RAWCODE", V.DataView.dtEmps!dvWed(0).SHIFT!FieldValTrim)
+			
+			V.Local.sShWed.Set(V.Args.PROCCODE)
+			'BP - we already have total hours from job details
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_HH)", V.Local.sFilter, V.Local.fTotalHours)
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_MM)", V.Local.sFilter, V.Local.fTotalMins)
+'			
+'			F.Intrinsic.Control.CallSub(ShiftTime, "DAY_HOURS", V.Local.fTotalHours, "DAY_MINS", V.Local.fTotalMins)
+'			
+'			V.Local.fTimeWed.Set(V.Args.TIME.Float)
+
+			V.Local.fTimeWed.Set(V.DataView.dtEmps!dvWed(0).Tot_Hrs!FieldValFloat)
+			f.Intrinsic.String.Format(V.Local.fTimeWed,"#.0",v.Local.fTimeWed)
+			
+		F.Intrinsic.Control.Else
+			'Set the values to blank otherwise
+			V.Local.sShWed.Set("")
+			V.Local.fTimeWed.Set(0.00)
+			
+		F.Intrinsic.Control.EndIf
+			
+		F.Data.DataView.Close("dtEmps", "dvWed")
+		
+		'Add one day to the date and repeat process -MONDAY-
+		F.Intrinsic.Date.DateAdd("d", 1, V.Local.dEnd, V.Local.dEnd)
+		
+		F.Intrinsic.String.Build("[EMPLOYEE] = '{0}' and [CHARGE_DATE] = '{1}'", V.Local.sEmp, V.Local.dEnd, V.Local.sFilter)
+		
+		F.Data.DataView.Create("dtEmps", "dvThr", 22, V.Local.sFilter, "CHARGE_DATE ASC")
+		
+		F.Intrinsic.Control.If(V.DataView.dtEmps!dvThr.RowCount, >, 0)
+			V.Local.sName.Set(V.DataView.dtEmps!dvThr(0).NAME!FieldValTrim)
+			V.Local.sDept.Set(V.DataView.dtEmps!dvThr(0).DEPT!FieldValTrim)
+			
+			F.Intrinsic.Control.CallSub(EarnCode, "RAWCODE", V.DataView.dtEmps!dvThr(0).SHIFT!FieldValTrim)
+			
+			V.Local.sShThr.Set(V.Args.PROCCODE)
+			
+			'BP - we already have total hours from job details
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_HH)", V.Local.sFilter, V.Local.fTotalHours)
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_MM)", V.Local.sFilter, V.Local.fTotalMins)
+'			
+'			F.Intrinsic.Control.CallSub(ShiftTime, "DAY_HOURS", V.Local.fTotalHours, "DAY_MINS", V.Local.fTotalMins)
+'			
+'			V.Local.fTimeThr.Set(V.Args.TIME.Float)
+			V.Local.fTimeThr.Set(V.DataView.dtEmps!dvThr(0).Tot_Hrs!FieldValFloat)
+			f.Intrinsic.String.Format(V.Local.fTimeThr,"#.0",v.Local.fTimeThr)
+			
+		F.Intrinsic.Control.Else
+			'Set the values to blank otherwise
+			V.Local.sShThr.Set("")
+			V.Local.fTimeThr.Set(0.00)
+			
+		F.Intrinsic.Control.EndIf
+			
+		F.Data.DataView.Close("dtEmps", "dvThr")
+		
+		'Add one day to the date and repeat process -MONDAY-
+		F.Intrinsic.Date.DateAdd("d", 1, V.Local.dEnd, V.Local.dEnd)
+		
+		F.Intrinsic.String.Build("[EMPLOYEE] = '{0}' and [CHARGE_DATE] = '{1}'", V.Local.sEmp, V.Local.dEnd, V.Local.sFilter)
+		
+		F.Data.DataView.Create("dtEmps", "dvFri", 22, V.Local.sFilter, "CHARGE_DATE ASC")
+		
+		F.Intrinsic.Control.If(V.DataView.dtEmps!dvFri.RowCount, >, 0)
+			V.Local.sName.Set(V.DataView.dtEmps!dvFri(0).NAME!FieldValTrim)
+			V.Local.sDept.Set(V.DataView.dtEmps!dvFri(0).DEPT!FieldValTrim)
+			
+			F.Intrinsic.Control.CallSub(EarnCode, "RAWCODE", V.DataView.dtEmps!dvFri(0).SHIFT!FieldValTrim)
+			
+			V.Local.sShFri.Set(V.Args.PROCCODE)
+			
+			'BP - we already have total hours from job details
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_HH)", V.Local.sFilter, V.Local.fTotalHours)
+'			F.Data.DataTable.Compute("dtEmps", "SUM(HOURS_MM)", V.Local.sFilter, V.Local.fTotalMins)
+'			
+'			F.Intrinsic.Control.CallSub(ShiftTime, "DAY_HOURS", V.Local.fTotalHours, "DAY_MINS", V.Local.fTotalMins)
+'			
+'			V.Local.fTimeFri.Set(V.Args.TIME.Float)
+			V.Local.fTimeFri.Set(V.DataView.dtEmps!dvFri(0).Tot_Hrs!FieldValFloat)
+			f.Intrinsic.String.Format(V.Local.fTimeFri,"#.0",v.Local.fTimeFri)
+			
+		F.Intrinsic.Control.Else
+			'Set the values to blank otherwise
+			V.Local.sShFri.Set("")
+			V.Local.fTimeFri.Set(0.00)
+			
+		F.Intrinsic.Control.EndIf
+			
+		F.Data.DataView.Close("dtEmps", "dvFri")
+		
+		'Add the total time for the week for this employee:
+		F.Intrinsic.Math.Add(V.Local.fTimeSat, V.Local.fTimeSun, V.Local.fTimeMon, V.Local.fTimeTue, V.Local.fTimeWed, V.Local.fTimeThr, V.Local.fTimeFri, V.Local.fTotalHours)
+		
+		F.Intrinsic.Math.Round(V.Local.fTimeSat, 2, V.Local.fTimeSat)
+		F.Intrinsic.Math.Round(V.Local.fTimeSun, 2, V.Local.fTimeSun)
+		F.Intrinsic.Math.Round(V.Local.fTimeMon, 2, V.Local.fTimeMon)
+		F.Intrinsic.Math.Round(V.Local.fTimeTue, 2, V.Local.fTimeTue)
+		F.Intrinsic.Math.Round(V.Local.fTimeWed, 2, V.Local.fTimeWed)
+		F.Intrinsic.Math.Round(V.Local.fTimeThr, 2, V.Local.fTimeThr)
+		F.Intrinsic.Math.Round(V.Local.fTimeFri, 2, V.Local.fTimeFri)
+		F.Intrinsic.Math.Round(V.Local.fTotalHours, 2, V.Local.fTotalHours)
+		
+		'Now we add the values to the BI table:
+		F.Data.DataTable.AddRow("dtSumLines", "EMP_NO", V.Local.sEmp, "EMP_NAME", V.Local.sName, "SAT_TIME", V.Local.fTimeSat, "SAT_SHIFT", V.Local.sShSat, "SUN_TIME", V.Local.fTimeSun, "SUN_SHIFT", V.Local.sShSun, "MON_TIME", V.Local.fTimeMon, "MON_SHIFT", V.Local.sShMon, "TUE_TIME", V.Local.fTimeTue, "TUE_SHFT", V.Local.sShTue, "WED_TIME", V.Local.fTimeWed, "WED_SHIFT", V.Local.sShWed, "THR_TIME", V.Local.fTimeThr, "THR_SHIFT", V.Local.sShThr, "FRI_TIME", V.Local.fTimeFri, "FRI_SHIFT", V.Local.sShFri, "TTL_TIME", V.Local.fTotalHours, "DEPT", V.Local.sDept)
+		
+	F.Intrinsic.Control.Next(V.Local.iLoop)
+	
+	'Now that we have added data to the BI tables, we can call for the report to print
+	F.Intrinsic.Control.CallSub(PrintReport)
+	
+F.Intrinsic.Control.Else
+	F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.Control.CallSub(Error, "Subroutine", V.Ambient.CurrentSubroutine, "ErrorNo", V.Ambient.ErrorNumber, "ErrorDesc", V.Ambient.ErrorDescription)
+F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.ProcessData.End
+
+Program.Sub.Error.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}", V.Caller.ScriptFile, V.Ambient.Newline, V.Args.Subroutine, V.Args.ErrorNo, V.Args.ErrorDesc, V.Ambient.GABVersion, V.Local.sError)
+
+F.Intrinsic.UI.CloseWaitDialog
+
+F.Intrinsic.UI.Msgbox(V.Local.sError, "CRITICAL ERROR")
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.Error.End
+
+Program.Sub.Unload.Start
+F.Intrinsic.Control.End
+Program.Sub.Unload.End
+
+Program.Sub.PrintReport.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sParams.Declare(String, "")
+V.Local.sValues.Declare(String, "")
+V.Local.iBIRunID.Declare(Long, 0)
+V.Local.iReportID.Declare(Long, 0)
+V.Local.iLogID.Declare(Long, 0)
+V.Local.iReturn.Declare(Long, 0)
+
+'We are going to call the report, save the data to the database with the processing info and print the information to the repts.
+F.Global.BI.GetRunID(V.Local.iBIRunID)
+
+F.Global.BI.GetIDFromName("GCG_6381_TA_SUMMARY.rpt", V.Local.iReportID)
+
+F.Global.BI.StartLogging(V.Local.iBIRunID, V.Local.iReportID, 0, "", V.Local.iLogID)
+
+'Add the report information to the datatables before saving
+F.Data.DataTable.SetValue("dtSumHead", -1, "TERMINAL_NO", V.Caller.Terminal, "BI_RUN_ID", V.Local.iBIRunID, "REPT_ID", V.Local.iReportID)
+F.Data.DataTable.SetValue("dtSumLines", -1, "TERMINAL_NO", V.Caller.Terminal, "BI_RUN_ID", V.Local.iBIRunID, "REPT_ID", V.Local.iReportID)
+
+F.Global.BI.StopLogging(V.Local.iLogID)
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+'Need to save both the header and the lines tables
+F.Data.DataTable.SaveToDB("dtSumHead", "conx", "GCG_6381_TA_HEAD", "", 128)
+F.Data.DataTable.SaveToDB("dtSumLines", "conx", "GCG_6381_TA_SUMMARY", "", 128)
+
+F.ODBC.Connection!conx.Close
+
+'Finally print the report
+F.Global.BI.RunReportPreProcessor(V.Local.iBIRunID, V.Local.iLogID, "TERMINAL_NO", V.Caller.Terminal, "", -1, True, "", -1, "", -1, "", "", V.Local.iReturn)
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.Control.CallSub(Error, "Subroutine", V.Ambient.CurrentSubroutine, "ErrorNo", V.Ambient.ErrorNumber, "ErrorDesc", V.Ambient.ErrorDescription)
+F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.PrintReport.End
+
+Program.Sub.EarnCode.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sRaw.Declare(String, "")
+V.Local.sProc.Declare(String, "")
+V.Local.bCheck.Declare(Boolean, False)
+
+'In this subroutine we are translating the Earnings code recorded in global shop to what the user is expecting in the report.
+'We are expecting a passed variable of 01 - 10
+
+F.Intrinsic.Variable.ArgExists("RAWCODE", V.Local.bCheck)
+
+F.Intrinsic.Control.If(V.Local.bCheck)
+	F.Intrinsic.String.LPad(V.Args.RAWCODE, "0", 2, V.Local.sRaw)
+	
+	F.Intrinsic.Control.SelectCase(V.Local.sRaw)
+	
+	F.Intrinsic.Control.Case("01")
+		'Regular pay
+		V.Local.sProc.Set("D")
+	
+	F.Intrinsic.Control.Case("02")
+		'Night Shift
+		V.Local.sProc.Set("N")
+	
+	F.Intrinsic.Control.Case("03")
+		'Day Lead
+		V.Local.sProc.Set("G")
+	
+	F.Intrinsic.Control.Case("04")
+		'Night Lead
+		V.Local.sProc.Set("P")
+	
+	F.Intrinsic.Control.Case("05")
+		'Vacation
+		V.Local.sProc.Set("V")
+	
+	F.Intrinsic.Control.Case("06")
+		'Floater
+		V.Local.sProc.Set("F")
+	
+	F.Intrinsic.Control.Case("07")
+		'Holiday
+		V.Local.sProc.Set("H")
+	
+	F.Intrinsic.Control.Case("08")
+		'Midnight Shift
+		V.Local.sProc.Set("M")
+	
+	F.Intrinsic.Control.Case("09")
+		'Bereavement
+		V.Local.sProc.Set("B")
+	
+	F.Intrinsic.Control.Case("10")
+		'Jury Duty
+		V.Local.sProc.Set("J")
+	
+	F.Intrinsic.Control.CaseElse
+		'The customer uses a handful of other codes but GSS is only capable of holding 11 different codes so we are unable to capture the rest
+		V.Local.sProc.Set("")
+		
+	F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Else
+	V.Local.sProc.Set("")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Variable.AddRV("PROCCODE", V.Local.sProc)
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.Control.CallSub(Error, "Subroutine", V.Ambient.CurrentSubroutine, "ErrorNo", V.Ambient.ErrorNumber, "ErrorDesc", V.Ambient.ErrorDescription)
+F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.EarnCode.End
+
+Program.Sub.ShiftTime.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.fTime.Declare(Float, 0.00)
+V.Local.fMins.Declare(Float, 0.00)
+V.Local.bCheck.Declare(Boolean, False)
+
+'This is a simple subroutine that receives two numerical values as long. One for hours and one for minutes
+'We are going to add these values together to return them as single hour value with fractional minutes
+F.Intrinsic.Variable.ArgExists("DAY_HOURS", V.Local.bCheck)
+
+F.Intrinsic.Control.If(V.Local.bCheck)
+	'The value in minutes needs to be converted to a fraction of hours and then added to the hours coming in
+	F.Intrinsic.Math.Div(V.Args.DAY_MINS.Float, 60, V.Local.fMins)
+	
+	F.Intrinsic.Math.Add(V.Args.DAY_HOURS.Long, V.Local.fMins, V.Local.fTime)
+	
+F.Intrinsic.Control.Else
+	V.Local.fTime.Set(0.00)
+	
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Variable.AddRV("TIME", V.Local.fTime)
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.Control.CallSub(Error, "Subroutine", V.Ambient.CurrentSubroutine, "ErrorNo", V.Ambient.ErrorNumber, "ErrorDesc", V.Ambient.ErrorDescription)
+F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.ShiftTime.End
+
+Program.Sub.Comments.Start
+${$5$}$2.0.0.0$}$2
+${$6$}$bpham$}$20231215150443953$}$Di0riF4Q5RIv6jxva5zSWHXcUtmDbQeB/E65Bg2xv3sVb8xnz0Dyi8xV9t0g92K/aKcE2TnU70w=
+Program.Sub.Comments.End
