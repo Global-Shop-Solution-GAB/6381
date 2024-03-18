@@ -1,0 +1,60 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Customer: LHD Equipment
+'Developer: FEQ (Sisco)
+'Date: June 8th
+'This is one of two reports that were created to help with keeping track of Time and Attendance.
+'This report will only gather all of the employees and print out a sheet with a list of employees grouped by department 
+'with spaces for the employee to fill out shift information for each employee in the department
+
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sSql.Declare(String, "")
+V.Local.sParams.Declare(String, "")
+V.Local.sValues.Declare(String, "")
+V.Local.iBIRunID.Declare(Long, 0)
+V.Local.iReportID.Declare(Long, 0)
+V.Local.iLogID.Declare(Long, 0)
+V.Local.iReturn.Declare(Long, 0)
+
+F.Global.BI.GetRunID(V.Local.iBIRunID)
+
+F.Global.BI.GetIDFromName("GCG_6381_TA_SHEET.rpt", V.Local.iReportID)
+
+F.Global.BI.StartLogging(V.Local.iBIRunID, V.Local.iReportID, 0, "", V.Local.iLogID)
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+F.Intrinsic.String.Build("Delete from GCG_6381_TA_SHEET where TERMINAL_NO = '{0}'", V.Caller.Terminal, V.Local.sSql)
+
+F.ODBC.Connection!conx.Execute(V.Local.sSql)
+
+F.Intrinsic.String.Build("Select TERMINAL_NO, BI_RUN_ID, REPT_ID, EMP_NO, EMP_NAME, DEPT from GCG_6381_TA_SHEET where TERMINAL_NO = '{0}'", V.Caller.Terminal, V.Local.sSql)
+
+F.Data.DataTable.CreateFromSQL("dtBI", "conx", V.Local.sSql, True)
+
+F.Data.DataTable.CreateFromSQL("dtEmps", "conx", "Select EMPLOYEE as EMP_NO, NAME as EMP_NAME, DEPT_EMPLOYEE as DEPT from V_EMPLOYEE_MSTR", True)
+
+F.Data.DataTable.Merge("dtEmps", "dtBI", True, 2)
+
+F.Data.DataTable.SetValue("dtBI", -1, "TERMINAL_NO", V.Caller.Terminal, "BI_RUN_ID", V.Local.iBIRunID, "REPT_ID", V.Local.iReportID)
+
+F.Global.BI.StopLogging(V.Local.iLogID)
+
+'Save data to database
+F.Data.DataTable.SaveToDB("dtBI", "conx", "GCG_6381_TA_SHEET", "", 128)
+
+F.Global.BI.RunReportPreProcessor(V.Local.iBIRunID, V.Local.iLogID, "TERMINAL_NO", V.Caller.Terminal, "", -1, True, "", -1, "", -1, "", "", V.Local.iReturn)
+
+F.ODBC.Connection!conx.Close
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}", V.Caller.ScriptFile, V.Ambient.Newline, V.Ambient.CurrentSubroutine, V.Ambient.ErrorNumber, V.Ambient.ErrorDescription, V.Ambient.GABVersion, V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError, "")
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
